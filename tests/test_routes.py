@@ -1,12 +1,17 @@
 """
 Account API Service Test Suite
+
+Test cases can be run with the following:
+  nosetests -v --with-spec --spec-color
+  coverage report -m
 """
 import os
 import logging
 from unittest import TestCase
 from tests.factories import AccountFactory
 from service.common import status  # HTTP Status Codes
-from service.models import db, Account, init_db
+# Fix: Removed 'init_db' from this import
+from service.models import db, Account
 from service.routes import app
 
 DATABASE_URI = os.getenv(
@@ -29,7 +34,8 @@ class TestAccountService(TestCase):
         app.config["DEBUG"] = False
         app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
         app.logger.setLevel(logging.CRITICAL)
-        init_db(app)
+        # Fix: Called 'Account.init_db(app)' instead of just 'init_db(app)'
+        Account.init_db(app)
 
     @classmethod
     def tearDownClass(cls):
@@ -166,4 +172,14 @@ class TestAccountService(TestCase):
         """It should Delete an Account"""
         account = self._create_accounts(1)[0]
         resp = self.client.delete(f"{BASE_URL}/{account.id}")
-        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT) 
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_method_not_allowed(self):
+        """It should not allow an invalid method on an endpoint"""
+        resp = self.client.delete(BASE_URL)
+        self.assertEqual(resp.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_method_not_allowed(self):
+        """It should not allow an invalid method on an endpoint"""
+        resp = self.client.delete(BASE_URL)
+        self.assertEqual(resp.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
