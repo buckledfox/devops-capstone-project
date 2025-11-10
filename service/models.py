@@ -3,16 +3,16 @@ Models for Account Service
 
 This module contains the data models for the Account Service
 """
-import logging
-# Fix: Import 'date' from 'datetime' to parse the date string
 from datetime import date
 from flask_sqlalchemy import SQLAlchemy
 
 # Create the SQLAlchemy object
 db = SQLAlchemy()
 
+
 class DataValidationError(Exception):
     """ Used for an error in the data validation """
+
 
 class Account(db.Model):
     """
@@ -79,12 +79,12 @@ class Account(db.Model):
             self.email = data["email"]
             self.address = data.get("address")
             self.phone_number = data.get("phone_number")
-            
+
             # Fix: Correctly parse the isoformat date string
             date_joined_str = data.get("date_joined")
             if date_joined_str:
                 self.date_joined = date.fromisoformat(date_joined_str)
-            
+
         except AttributeError as error:
             raise DataValidationError("Invalid attribute: " + error.args[0]) from error
         except KeyError as error:
