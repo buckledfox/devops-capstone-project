@@ -4,10 +4,14 @@ Package for the application models and service routes
 """
 import logging
 from flask import Flask
+from flask_talisman import Talisman
 
 # Create Flask application
 app = Flask(__name__)
 app.config.from_object("service.config")
+
+# Initialize Talisman
+talisman = Talisman(app)
 
 # Initialize logging
 app.logger.setLevel(logging.INFO)
