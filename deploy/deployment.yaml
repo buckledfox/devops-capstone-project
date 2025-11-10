@@ -18,11 +18,11 @@ spec:
         app: accounts
     spec:
       containers:
-      - image: us.icr.io/sn-labs-apoorvpatil2/accounts:1
+      - image: IMAGE_NAME_HERE  # <-- CRITICAL CHANGE FOR TEKTON PIPELINE
         name: accounts
         resources: {}
         # -----------------------------------------------
-        # START OF REQUIRED EDITS FOR STEP 6.4 (EXERCISE 7)
+        # DATABASE ENVIRONMENT VARIABLES (FROM LAB 7)
         # -----------------------------------------------
         env:
         - name: DATABASE_HOST
