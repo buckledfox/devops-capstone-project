@@ -1,145 +1,144 @@
 """
-Models for Account
+Account Service
 
-All of the models are stored in this module
+This microservice handles the lifecycle of Accounts
 """
-import logging
-from datetime import date
-from flask_sqlalchemy import SQLAlchemy
-
-logger = logging.getLogger("flask.app")
-
-# Create the SQLAlchemy object to be initialized later in init_db()
-db = SQLAlchemy()
+# pylint: disable=unused-import
+from flask import jsonify, request, make_response, abort, url_for  # noqa; F401
+from service.models import Account
+from service.common import status  # HTTP Status Codes
+from . import app  # Import Flask application
 
 
-class DataValidationError(Exception):
-    """Used for an data validation errors when deserializing"""
-
-
-def init_db(app):
-    """Initialize the SQLAlchemy app"""
-    Account.init_db(app)
+############################################################
+# Health Endpoint
+############################################################
+@app.route("/health")
+def health():
+    """Health Status"""
+    return jsonify(dict(status="OK")), status.HTTP_200_OK
 
 
 ######################################################################
-#  P E R S I S T E N T   B A S E   M O D E L
+# GET INDEX
 ######################################################################
-class PersistentBase:
-    """Base class added persistent methods"""
-
-    def __init__(self):
-        self.id = None  # pylint: disable=invalid-name
-
-    def create(self):
-        """
-        Creates a Account to the database
-        """
-        logger.info("Creating %s", self.name)
-        self.id = None  # id must be none to generate next primary key
-        db.session.add(self)
-        db.session.commit()
-
-    def update(self):
-        """
-        Updates a Account to the database
-        """
-        logger.info("Updating %s", self.name)
-        db.session.commit()
-
-    def delete(self):
-        """Removes a Account from the data store"""
-        logger.info("Deleting %s", self.name)
-        db.session.delete(self)
-        db.session.commit()
-
-    @classmethod
-    def init_db(cls, app):
-        """Initializes the database session"""
-        logger.info("Initializing database")
-        cls.app = app
-        # This is where we initialize SQLAlchemy from the Flask app
-        db.init_app(app)
-        app.app_context().push()
-        db.create_all()  # make our sqlalchemy tables
-
-    @classmethod
-    def all(cls):
-        """Returns all of the records in the database"""
-        logger.info("Processing all records")
-        return cls.query.all()
-
-    @classmethod
-    def find(cls, by_id):
-        """Finds a record by it's ID"""
-        logger.info("Processing lookup for id %s ...", by_id)
-        return cls.query.get(by_id)
+@app.route("/")
+def index():
+    """Root URL response"""
+    return (
+        jsonify(
+            name="Account REST API Service",
+            version="1.0",
+            # paths=url_for("list_accounts", _external=True),
+        ),
+        status.HTTP_200_OK,
+    )
 
 
 ######################################################################
-#  A C C O U N T   M O D E L
+# CREATE A NEW ACCOUNT
 ######################################################################
-class Account(db.Model, PersistentBase):
+@app.route("/accounts", methods=["POST"])
+def create_accounts():
     """
-    Class that represents an Account
+    Creates an Account
+    This endpoint will create an Account based the data in the body that is posted
     """
+    app.logger.info("Request to create an Account")
+    check_content_type("application/json")
+    account = Account()
+    account.deserialize(request.get_json())
+    account.create()
+    message = account.serialize()
+    # Uncomment once get_accounts has been implemented
+    # location_url = url_for("get_accounts", account_id=account.id, _external=True)
+    location_url = "/"  # Remove once get_accounts has been implemented
+    return make_response(
+        jsonify(message), status.HTTP_201_CREATED, {"Location": location_url}
+    )
 
-    app = None
 
-    # Table Schema
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64))
-    email = db.Column(db.String(64))
-    address = db.Column(db.String(256))
-    phone_number = db.Column(db.String(32), nullable=True)  # phone number is optional
-    date_joined = db.Column(db.Date(), nullable=False, default=date.today())
+######################################################################
+# READ AN ACCOUNT
+######################################################################
+@app.route("/accounts/<int:account_id>", methods=["GET"])
+def get_accounts(account_id):
+    """
+    Reads an Account
+    This endpoint will read an Account based the account_id that is requested
+    """
+    app.logger.info("Request to read an Account with id: %s", account_id)
+    account = Account.find(account_id)
+    if not account:
+        abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] could not be found.")
+    return account.serialize(), status.HTTP_200_OK
 
-    def __repr__(self):
-        return f"<Account {self.name} id=[{self.id}]>"
 
-    def serialize(self):
-        """Serializes a Account into a dictionary"""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "address": self.address,
-            "phone_number": self.phone_number,
-            "date_joined": self.date_joined.isoformat()
-        }
+######################################################################
+#  U T I L I T Y   F U N C T I O N S
+######################################################################
 
-    def deserialize(self, data):
-        """
-        Deserializes a Account from a dictionary
 
-        Args:
-            data (dict): A dictionary containing the resource data
-        """
-        try:
-            self.name = data["name"]
-            self.email = data["email"]
-            self.address = data["address"]
-            self.phone_number = data.get("phone_number")
-            date_joined = data.get("date_joined")
-            if date_joined:
-                self.date_joined = date.fromisoformat(date_joined)
-            else:
-                self.date_joined = date.today()
-        except KeyError as error:
-            raise DataValidationError("Invalid Account: missing " + error.args[0]) from error
-        except TypeError as error:
-            raise DataValidationError(
-                "Invalid Account: body of request contained "
-                "bad or no data - " + error.args[0]
-            ) from error
-        return self
+def check_content_type(media_type):
+    """Checks that the media type is correct"""
+    content_type = request.headers.get("Content-Type")
+    if content_type and content_type == media_type:
+        return
+    app.logger.error("Invalid Content-Type: %s", content_type)
+    abort(
+        status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        f"Content-Type must be {media_type}",
+    )
 
-    @classmethod
-    def find_by_name(cls, name):
-        """Returns all Accounts with the given name
 
-        Args:
-            name (string): the name of the Accounts you want to match
-        """
-        logger.info("Processing name query for %s ...", name)
-        return cls.query.filter(cls.name == name)
+######################################################################
+# LIST ALL ACCOUNTS
+######################################################################
+
+@app.route("/accounts", methods=["GET"])
+def list_accounts():
+    """
+    List all Accounts
+    This endpoint will list all Accounts
+    """
+    app.logger.info("Request to list Accounts")
+    accounts = Account.all()
+    account_list = [account.serialize() for account in accounts]
+    app.logger.info("Returning [%s] accounts", len(account_list))
+    return jsonify(account_list), status.HTTP_200_OK
+
+
+######################################################################
+# UPDATE AN EXISTING ACCOUNT
+######################################################################
+
+@app.route("/accounts/<int:account_id>", methods=["PUT"])
+def update_accounts(account_id):
+    """
+    Update an Account
+    This endpoint will update an Account based on the posted data
+    """
+    app.logger.info("Request to update an Account with id: %s", account_id)
+    account = Account.find(account_id)
+    if not account:
+        abort(status.HTTP_404_NOT_FOUND, f"Account with id [{account_id}] could not be found.")
+    account.deserialize(request.get_json())
+    account.update()
+    return account.serialize(), status.HTTP_200_OK
+
+
+######################################################################
+# DELETE AN ACCOUNT
+######################################################################
+
+@app.route("/accounts/<int:account_id>", methods=["DELETE"])
+def delete_accounts(account_id):
+    """
+    Delete an Account
+    This endpoint will delete an Account based on the account_id that is requested
+    """
+    app.logger.info("Request to delete an Account with id: %s", account_id)
+    account = Account.find(account_id)
+    if account:
+        account.delete()
+    return "", status.HTTP_204_NO_CONTENT
