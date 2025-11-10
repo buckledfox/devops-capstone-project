@@ -5,6 +5,7 @@ Package for the application models and service routes
 import logging
 from flask import Flask
 from flask_talisman import Talisman
+from flask_cors import CORS
 
 # Create Flask application
 app = Flask(__name__)
@@ -12,6 +13,9 @@ app.config.from_object("service.config")
 
 # Initialize Talisman
 talisman = Talisman(app)
+
+# Initialize CORS
+CORS(app)
 
 # Initialize logging
 app.logger.setLevel(logging.INFO)
