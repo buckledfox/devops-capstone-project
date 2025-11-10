@@ -126,3 +126,4 @@ class Account(db.Model):
         """
         cls.app.logger.info("Processing name query for %s ...", name)
         return cls.query.filter(cls.name == name)
+        
