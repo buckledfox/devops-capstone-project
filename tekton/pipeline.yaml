@@ -6,7 +6,7 @@
 ---
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
-metadata:  
+metadata: 
   name: cd-pipeline
 spec:
   workspaces:
@@ -15,6 +15,7 @@ spec:
     - name: repo-url
     - name: branch
       default: main
+    - name: build-image  # <-- ADDED: REQUIRED FOR BUILD/DEPLOY TASKS
   tasks:
     - name: init
       workspaces:
@@ -35,7 +36,8 @@ spec:
       - name: revision
         value: $(params.branch)
       runAfter:
-        - init
+      - init
+
     - name: lint
       workspaces:
       - name: source
@@ -48,7 +50,8 @@ spec:
       - name: args
         value: ["--count", "--max-complexity=10","--max-line-length=127","--statistics"]
       runAfter:
-        - clone
+      - clone
+
     - name: tests
       workspaces:
       - name: source
@@ -61,4 +64,50 @@ spec:
       - name: args
         value: "-v --with-spec --spec-color"
       runAfter:
-        - clone
+      - clone
+
+    # -----------------------------------------------
+    # START OF BUILD TASK (EXERCISE 7)
+    # -----------------------------------------------
+    - name: build
+      workspaces:
+      - name: source
+        workspace: pipeline-workspace
+      taskRef:
+        name: buildah
+        kind: ClusterTask # Important: buildah is a ClusterTask
+      params:
+      - name: IMAGE
+        value: "$(params.build-image)"
+      runAfter:
+      - tests
+      - lint
+    # -----------------------------------------------
+    # END OF BUILD TASK
+    # -----------------------------------------------
+
+    # -----------------------------------------------
+    # START OF DEPLOY TASK (EXERCISE 8)
+    # -----------------------------------------------
+    - name: deploy
+      workspaces:
+      - name: manifest-dir
+        workspace: pipeline-workspace
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask # Important: openshift-client is a ClusterTask
+      params:
+      - name: SCRIPT
+        value: |
+          echo "Updating manifest..."
+          # SED command to replace the image placeholder with the actual build image tag
+          sed -i "s|IMAGE_NAME_HERE|$(params.build-image)|g" deploy/deployment.yaml
+          cat deploy/deployment.yaml
+          echo "Deploying to OpenShift..."
+          oc apply -f deploy/
+          oc get pods -l app=accounts
+      runAfter:
+      - build
+    # -----------------------------------------------
+    # END OF DEPLOY TASK
+    # -----------------------------------------------
