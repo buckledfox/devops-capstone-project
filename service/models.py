@@ -6,6 +6,7 @@ This module contains the data models for the Account Service
 from datetime import date
 from flask_sqlalchemy import SQLAlchemy
 
+
 # Create the SQLAlchemy object
 db = SQLAlchemy()
 
@@ -126,4 +127,3 @@ class Account(db.Model):
         """
         cls.app.logger.info("Processing name query for %s ...", name)
         return cls.query.filter(cls.name == name)
-        
